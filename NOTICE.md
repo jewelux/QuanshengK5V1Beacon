@@ -1,20 +1,17 @@
 # Herkunft und Anerkennung
 
-Diese 70-cm-Peilsender-Firmware ist eine abgeleitete Arbeit auf Basis von
-**Dennis Reals** Projekt `reald/uv-k5-firmware-custom`:
+Diese Peilsender-Erweiterung basiert auf der Firmware von **Dennis Real**:
 
 https://github.com/reald/uv-k5-firmware-custom
 
-Verwendete Ausgangsbasis:
-
-- Autor der Basis: Dennis Real
 - Basis-Commit: `5955ccfc8732f4a16b628276ed5fa98f2db54e55`
-- Commit-Datum: 2. August 2026
-- Commit-Titel: `ARDF: Introduce negative gain settings for additional attenuation close to tranmitters`
+- Datum des Basis-Commits: 2. August 2026
+- Titel: `ARDF: Introduce negative gain settings for additional attenuation close to tranmitters`
 
-Die ursprüngliche Git-Historie wurde im Repository beibehalten. Die
-Beacon-Erweiterungen ergänzen Dennis' bestehende Firmwarearchitektur,
-Hauptschleife, Tastaturverarbeitung und Menüsystem.
+Die Änderungen ergänzen Dennis' Hauptschleife, Tastaturverarbeitung,
+Menüsystem und Gerätetreiber. Dieses kleine Overlay-Repository enthält deshalb
+nur die geänderten Dateien und verweist für den unveränderten Quellcode auf
+das Originalprojekt.
 
-Die Nennung von Dennis Real bedeutet keine Zusicherung oder offizielle
-Unterstützung dieser experimentellen Peilsender-Erweiterung durch ihn.
+Die Nennung bedeutet keine offizielle Unterstützung dieser experimentellen
+Erweiterung durch Dennis Real.
