@@ -1,5 +1,10 @@
 # Flashing V1 and V3
 
+> **Both images transmit FM Morse audio, not AM.** Use an FM receiver on the
+> beacon frequency. An AM menu setting does not provide AM transmission. See
+> [modulation and receiver compatibility](README.md#modulation-and-receiver-compatibility)
+> before choosing receivers for a hunt.
+
 Identify the hardware before selecting firmware. V1 uses DP32G030; V3 uses
 PY32F071. A V3 label alone is not conclusive: the upstream project reports
 mislabeled V2 devices. Compare the installed version and upstream hardware

@@ -103,6 +103,19 @@ checks remain enabled. Optional output paths export PBM screenshots for inspecti
 A successful test exits with status 0. Runtime tests simulate driver behavior;
 only the display tests use actual upstream rendering code.
 
+## Receiver setting for every field test
+
+Both beacon builds transmit **FM**, not AM. Set the receiving radio to **FM on
+the beacon frequency**. A clean tone on an FM receiver is the expected result.
+AM-only peiling receivers are not directly compatible; see
+[the modulation explanation](../README.md#modulation-and-receiver-compatibility).
+Do not record reception alone as validation of an AM emission.
+
+The operator subsequently reported clean FM reception on V3, and a near-field
+trial at 1% LOW with sensitivity 00 and a short rubber antenna without full-scale
+field-strength indication. This is encouraging for a practical range test, but
+it is not a complete range or full acceptance result for both hardware targets.
+
 ## Hardware acceptance — perform separately for each target
 
 1. Record exact hardware model, current firmware, and backup files.

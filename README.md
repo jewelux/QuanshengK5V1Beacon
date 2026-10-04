@@ -2,6 +2,12 @@
 
 [Deutsche Anleitung](README.de.md)
 
+> **IMPORTANT — FM transmitter, not AM:** Both V1 and V3 beacon builds transmit
+> a keyed audio tone on an **FM carrier**. Set the receiving radio to **FM** on
+> the beacon frequency. These images do not transmit the AM signal normally
+> used by classical 2 m ARDF foxes. The radio's AM receive setting does not
+> turn its transmitter into an AM transmitter.
+
 A dedicated homing beacon for amateur-radio direction finding, built on
 **Dennis Real's firmware**. The repository retains its historical GitHub name
 `QuanshengK5V1Beacon`, but now contains separate V1 and V3 build targets.
@@ -31,6 +37,33 @@ The percentage is a **relative control setting**, not a watt reading or a linear
 percentage of radiated power. Start low, test reception at the intended distance,
 and increase the percentage until the range suits your event. V1 and V3 need
 separate field adjustments even when their displayed percentages match.
+
+## Modulation and receiver compatibility
+
+| Application | Emission |
+| --- | --- |
+| This project's V1 and V3 70 cm beacons | FM carrier with keyed Morse audio (F2A-style) |
+| Classical IARU Region 1 ARDF on 144 MHz | AM with Morse audio, A2A; 70–80% modulation depth |
+| Classical IARU Region 1 ARDF on 3.5 MHz | Keyed unmodulated carrier, A1A/CW |
+
+For this project, use **FM reception on the same frequency**. During Morse
+spaces only the audio is muted; the carrier remains on. After two complete
+identifiers, the five-second pause switches RF off.
+
+An AM-only peiling receiver is not directly compatible with the intended FM
+signal. Incidental or off-frequency reception must not be mistaken for proof
+that the transmitter produces AM. The existing AM/SSB options in the Quansheng
+firmware concern reception; changing a menu label or allowing TX while AM is
+selected does not create genuine AM transmission.
+
+The international ARDF rules cited here cover 3.5 and 144 MHz. Our 70 cm FM
+training/fox-hunt project is a separate application, not an implementation of
+the prescribed 144 MHz AM emission. Genuine AM for compatibility with AM peiling
+receivers remains a research topic and has not been implemented or validated.
+
+Sources:
+- [IARU Region 1 ARDF Rules, Part B 2025](https://www.iaru-r1.org/wp-content/uploads/2025/01/ARDF-Rules_B_2025.pdf), section 14.1 and Appendix 1, T2.6/T2.8.
+- [Egzumer: radio operation, TX limitations](https://github.com/egzumer/uv-k5-firmware-custom/wiki/Radio-operation#tx-on-all-bands), explaining FM-only normal transmission and the receive-only role of AM/SSB selection.
 
 ## Admin mode
 

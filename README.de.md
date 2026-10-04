@@ -2,6 +2,23 @@
 
 [English documentation](README.md)
 
+> **WICHTIG — dieser Peilsender sendet FM, nicht AM:** Das gilt für V1 und V3.
+> Am Empfänger **FM auf der Senderfrequenz** einstellen. Die Firmware erzeugt
+> einen getasteten Morseton auf einem FM-Träger. Sie erzeugt nicht das AM-Signal
+> eines klassischen 2-m-ARDF-Fuchses. Die AM-Einstellung des Quansheng betrifft
+> den Empfang und schaltet den Sender nicht auf echte AM um.
+
+Beim klassischen ARDF ist auf 2 m AM mit Morseton (A2A, 70–80 % Modulationstiefe)
+und auf 80 m ein getasteter Träger (A1A/CW) vorgesehen. Die internationalen Regeln
+behandeln 3,5 und 144 MHz; unser 70-cm-FM-Projekt ist für einen entsprechend
+abgestimmten Trainings-/Fuchsjagdbetrieb gedacht. Ein reiner AM-Peilempfänger
+ist mit dem vorgesehenen FM-Signal nicht direkt kompatibel. Echte AM-Aussendung
+ist in diesem Projekt noch nicht implementiert oder geprüft.
+
+Während der Morsezeichenpausen bleibt der Träger eingeschaltet; nach zwei
+Kennungen folgen fünf Sekunden mit ausgeschalteter HF.
+Quellen und ausführliche Erklärung: [Modulation and receiver compatibility](README.md#modulation-and-receiver-compatibility).
+
 **V3:** Eine erste Portierung auf Basis von Dennis Reals V3-Firmware ist
 vorbereitet. ARM-Build und PC-Tests bestanden; der Gerätetest steht aus.
 V3 zeigt jetzt alle vier Menüpunkte gleichzeitig: Freq, Power, ID und Tone.

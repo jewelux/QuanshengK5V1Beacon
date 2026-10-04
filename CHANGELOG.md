@@ -1,5 +1,13 @@
 # Changelog
 
+## Explicit FM documentation — 4 October 2026
+
+- Prominent English/German README and flashing-guide notices: both targets
+  transmit FM Morse audio; receivers should use FM on the beacon frequency.
+- Explain compatibility limits for AM-only receivers and distinguish classical
+  144 MHz A2A and 3.5 MHz A1A ARDF emissions, with primary-source references.
+- No firmware or modulation changes; genuine AM remains unimplemented.
+
 ## Hardware-test follow-up — 4 October 2026
 
 - Fix a two-page font starting on the last of seven framebuffer pages. It
