@@ -17,7 +17,7 @@ Firmware gelegt.
 - Kennungen `MO`, `MOE`, `MOI`, `MOS`, `MOH` und `MO5`
 - zweimalige Kennung, danach fünf Sekunden vollständige Sendepause
 - 750 ms HF-Vorlauf vor der ersten Kennung
-- Frequenz 430,0125 bis 439,9875 MHz in 12,5-kHz-Schritten
+- Frequenz 430,013 bis 439,987 MHz in 1-kHz-Schritten
 - Tonfrequenz 400 bis 1500 Hz in 50-Hz-Schritten
 - Leistung 1 bis 100 % des originalen LOW-DAC-Werts in 1-%-Schritten
 - Speicherung der Einstellungen im EEPROM
@@ -32,7 +32,16 @@ MENU beim Einschalten gedrückt halten. Danach:
 
 - UP/DOWN: Menüpunkt oder Wert wählen
 - MENU: öffnen beziehungsweise speichern
-- EXIT: zurück
+- EXIT: Eingabe verwerfen / zurück
+- `BcnFrq`: MENU, sechs Ziffern in kHz eingeben (z. B. `433092` für
+  433,092 MHz), MENU speichert. UP/DOWN verändert um 1 kHz.
+- `BcnPwr`: MENU, `1` bis `100` eingeben, MENU speichert.
+  1 % ist der Standard bei fehlender oder ungültiger Beacon-Konfiguration.
+  Gespeicherte Werte (z. B. 17 %) bleiben nach Aus-/Einschalten erhalten.
+
+Unvollständige oder unzulässige Eingaben werden beim Speichern abgewiesen;
+EXIT verwirft sie. Alte gültige EEPROM-Konfigurationen werden übernommen,
+Frequenzen dabei auf den nächsten zulässigen 1-kHz-Wert gerundet.
 
 Menüpunkte: `BcnFrq`, `BcnPwr`, `BcnID` und `BcnTon`. Im Admin-Modus wird
 nicht gesendet.
@@ -55,12 +64,41 @@ Leerzeichen verwenden. PowerShell-Beispiel:
 .\scripts\prepare-upstream.ps1 -Destination C:\UVK5BeaconBuild
 Set-Location C:\UVK5BeaconBuild
 make clean
-make ENABLE_BEACON_MO=1 ENABLE_PREVENT_TX=0
+make ENABLE_BEACON_MO=1 ENABLE_PREVENT_TX=0 ENABLE_ARDF=0 ENABLE_SPECTRUM=0 ENABLE_FMRADIO=0
 ```
+
+Der Beacon-Build schaltet ARDF-Empfänger, Spektrumanzeige und UKW-Radio aus,
+damit das Image in den V1-Flash passt. Erfolgreich geprüft mit ARM GCC 12.2.1.
 
 Das Skript klont Dennis' Originalprojekt, wechselt auf den festgelegten
 Basis-Commit und kopiert die Dateien aus `source/` darüber. Das Ergebnis
 `firmware_uvk5_v1.packed.bin` ist das flashbare Image.
+
+## Entwicklerprüfung
+
+Nach dem Zusammensetzen des Quellbaums lässt sich die EEPROM-Logik auch
+auf einem PC mit GCC testen (Beispiel unter Linux):
+
+```sh
+gcc -std=gnu2x -DENABLE_BEACON_MO -I/path/to/prepared-upstream \
+  -ffunction-sections -fdata-sections tests/beacon-config.c \
+  -Wl,--gc-sections -o /tmp/beacon-config-test
+/tmp/beacon-config-test
+```
+
+Der Test prüft Standardwerte, Speicherung, ungültige Leistungswerte sowie
+Migration gültiger V2/V3-Konfigurationen einschließlich aller alten Frequenzen.
+
+## Entwicklungsstand und Ausblick
+
+Die Tastatureingabe und EEPROM-Migration sind implementiert. Der neue V1-Build
+und die EEPROM-Tests wurden softwareseitig geprüft; ein Gerätetest dieses
+neuen Images steht noch aus. Der vorherige Beacon-Stand wurde vom Betreiber
+praktisch getestet.
+
+Die automatische Fünf-Fuchs-Zeitsteuerung ist noch nicht implementiert.
+Die diskutierte Synchronisation über Nachbarn und CTCSS ist als
+[Projektidee](docs/ideas/fox-sync.md) dokumentiert.
 
 ## Sicherheit
 

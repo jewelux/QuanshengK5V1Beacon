@@ -1,5 +1,17 @@
 # Änderungsprotokoll
 
+## Admin-Tastatureingabe (zur Prüfung)
+
+Vorbereitet am 3. Oktober 2026, dokumentiert am 4. Oktober 2026.
+Build und EEPROM-Tests bestanden; Hardwaretest des neuen Images steht aus.
+
+- Frequenz direkt mit sechs Ziffern in kHz; 1-kHz-Auflösung
+- Leistung direkt mit 1–100 %; MENU speichert, EXIT verwirft
+- Standardleistung 1 % bei fehlender/ungültiger Konfiguration
+- Gespeicherte Leistung bleibt erhalten; EEPROM V2/V3 wird auf V4 migriert
+- Alte Frequenzen werden auf den nächsten zulässigen kHz-Wert gerundet
+- Build-Anleitung mit passenden V1-Optionen; CRC-Fallback auch über make
+
 ## Beacon-Version
 
 - 70-cm-Peilsenderbetrieb für UV-K5 V1

@@ -1425,6 +1425,19 @@ static void MENU_Key_0_to_9(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld)
 		return;
 	}
 
+#ifdef ENABLE_BEACON_MO
+	if (gIsInSubMenu && (UI_MENU_GetCurrentMenuId() == MENU_BCN_FR || UI_MENU_GetCurrentMenuId() == MENU_BCN_PW)) {
+		const uint8_t digits = UI_MENU_GetCurrentMenuId() == MENU_BCN_FR ? 6u : 3u;
+		if (gInputBoxIndex >= digits) {
+			gBeepToPlay = BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL;
+			return;
+		}
+		INPUTBOX_Append(Key);
+		gRequestDisplayScreen = DISPLAY_MENU;
+		return;
+	}
+#endif
+
 	INPUTBOX_Append(Key);
 
 	gRequestDisplayScreen = DISPLAY_MENU;
@@ -1679,6 +1692,20 @@ static void MENU_Key_MENU(const bool bKeyPressed, const bool bKeyHeld)
 
 		return;
 	}
+
+#ifdef ENABLE_BEACON_MO
+	if (gInputBoxIndex > 0 && (UI_MENU_GetCurrentMenuId() == MENU_BCN_FR || UI_MENU_GetCurrentMenuId() == MENU_BCN_PW)) {
+		int32_t minimum, maximum;
+		const int32_t value = StrToUL(INPUTBOX_GetAscii());
+		BEACON_GetMenuLimits(UI_MENU_GetCurrentMenuId(), &minimum, &maximum);
+		if ((UI_MENU_GetCurrentMenuId() == MENU_BCN_FR && gInputBoxIndex != 6u) || value < minimum || value > maximum) {
+			gBeepToPlay = BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL;
+			return;
+		}
+		gSubMenuSelection = value;
+		gInputBoxIndex = 0;
+	}
+#endif
 
 	if (UI_MENU_GetCurrentMenuId() == MENU_MEM_NAME)
 	{

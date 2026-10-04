@@ -23,4 +23,4 @@ if ($LASTEXITCODE -ne 0) { throw 'Checking out the required upstream commit fail
 Copy-Item -Path (Join-Path $overlay '*') -Destination $destinationPath -Recurse -Force
 
 Write-Host "Prepared source tree: $destinationPath"
-Write-Host 'Build with: make ENABLE_BEACON_MO=1 ENABLE_PREVENT_TX=0'
+Write-Host 'Build with: make ENABLE_BEACON_MO=1 ENABLE_PREVENT_TX=0 ENABLE_ARDF=0 ENABLE_SPECTRUM=0 ENABLE_FMRADIO=0'

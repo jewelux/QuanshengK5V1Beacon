@@ -544,6 +544,21 @@ void UI_DisplayMenu(void)
 		case MENU_BCN_ID:
 		case MENU_BCN_TN:
 			BEACON_FormatMenuValue(UI_MENU_GetCurrentMenuId(), gSubMenuSelection, String);
+			if (gIsInSubMenu && gInputBoxIndex > 0 &&
+			    (UI_MENU_GetCurrentMenuId() == MENU_BCN_FR || UI_MENU_GetCurrentMenuId() == MENU_BCN_PW)) {
+				if (UI_MENU_GetCurrentMenuId() == MENU_BCN_FR) {
+					char digits[7] = "______";
+					for (uint8_t i = 0; i < gInputBoxIndex && i < 6u; ++i)
+						digits[i] = '0' + gInputBox[i];
+					sprintf(String, "%.3s.%s\nMHz", digits, digits + 3);
+				} else {
+					char digits[4];
+					for (uint8_t i = 0; i < gInputBoxIndex; ++i)
+						digits[i] = '0' + gInputBox[i];
+					digits[gInputBoxIndex] = 0;
+					sprintf(String, "%s%%\nof LOW", digits);
+				}
+			}
 			break;
 #endif
 		case MENU_SQL:
