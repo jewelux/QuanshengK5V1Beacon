@@ -4,17 +4,41 @@
 
 static BEACON_Config_t saved;
 
+#ifdef BEACON_PLATFORM_V3
+void PY25Q16_ReadBuffer(uint32_t address, void *buffer, uint32_t size)
+#else
 void EEPROM_ReadBuffer(uint16_t address, void *buffer, uint8_t size)
+#endif
 {
-	(void)address;
+	assert(address == BEACON_EEPROM_ADDRESS);
+#ifdef BEACON_PLATFORM_V3
+	assert(size == sizeof(saved));
+#endif
 	memcpy(buffer, &saved, size);
 }
 
+#ifdef BEACON_PLATFORM_V3
+void PY25Q16_WriteBuffer(uint32_t address, const void *buffer, uint32_t size, bool append)
+#else
 void EEPROM_WriteBuffer(uint16_t address, const void *buffer)
+#endif
 {
-	(void)address;
+	assert(address == BEACON_EEPROM_ADDRESS);
+#ifdef BEACON_PLATFORM_V3
+	assert(size == sizeof(saved));
+#endif
+#ifdef BEACON_PLATFORM_V3
+	assert(!append);
+#endif
 	memcpy(&saved, buffer, sizeof(saved));
 }
+
+#ifdef BEACON_PLATFORM_V3
+#include "app/beacon-admin.c"
+bool gUpdateDisplay;
+static void press(KEY_Code_t key) { BEACON_V3AdminKey(key, true, false); }
+static void type(const char *text) { while (*text) press((KEY_Code_t)(*text++ - '0')); }
+#endif
 
 int main(void)
 {
@@ -66,6 +90,35 @@ int main(void)
 		assert(gBeaconConfig.power_percent == (power + 1) * 20);
 		assert(BEACON_GetCode() == 5 && BEACON_GetToneIndex() == 12);
 	}
+
+#ifdef BEACON_PLATFORM_V3
+	BEACON_DefaultConfig();
+	BEACON_V3AdminInit();
+	press(KEY_MENU); type("43309"); press(KEY_MENU);
+	assert(editing && BEACON_GetFrequency() == 43350000); // incomplete
+	press(KEY_2); press(KEY_MENU);
+	assert(!editing && BEACON_GetFrequency() == 43309200);
+	press(KEY_MENU); type("439988"); press(KEY_MENU);
+	assert(editing && BEACON_GetFrequency() == 43309200); // out of range
+	press(KEY_EXIT);
+	press(KEY_DOWN); press(KEY_MENU); type("17"); press(KEY_MENU);
+	BEACON_LoadConfig(); assert(gBeaconConfig.power_percent == 17);
+	press(KEY_MENU); type("101"); press(KEY_MENU);
+	assert(editing && gBeaconConfig.power_percent == 17);
+	press(KEY_EXIT); press(KEY_MENU); type("50"); press(KEY_EXIT);
+	assert(gBeaconConfig.power_percent == 17);
+	press(KEY_MENU); type("0"); press(KEY_MENU);
+	assert(editing && gBeaconConfig.power_percent == 17);
+	press(KEY_EXIT); press(KEY_MENU); press(KEY_UP); press(KEY_MENU);
+	assert(gBeaconConfig.power_percent == 18);
+	BEACON_V3AdminKey(KEY_PTT, true, false);
+	assert(gBeaconConfig.power_percent == 18);
+#endif
+
+	/* MO5 is the longest sequence: two complete words fit in the event buffer. */
+	gBeaconConfig.code_tone = (gBeaconConfig.code_tone & ~7u) | 5u;
+	BEACON_BuildSequence();
+	assert(gBeaconEventCount == 40 && gBeaconEvents[19] == 7 && gBeaconEvents[39] == 7);
 
 	saved.checksum ^= 1;
 	BEACON_LoadConfig();

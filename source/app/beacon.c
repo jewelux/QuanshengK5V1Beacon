@@ -1,4 +1,4 @@
-/* Non-blocking ARDF homing beacon integrated into Dennis' normal UI loop. */
+/* Non-blocking homing beacon shared by the V1 and V3 overlays. */
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -7,7 +7,12 @@
 #include "app/beacon.h"
 #include "driver/backlight.h"
 #include "driver/bk4819.h"
+#ifdef BEACON_PLATFORM_V3
+#include "driver/py25q16.h"
+#include "frequencies.h"
+#else
 #include "driver/eeprom.h"
+#endif
 #include "external/printf/printf.h"
 #include "functions.h"
 #include "helper/battery.h"
@@ -15,7 +20,9 @@
 #include "radio.h"
 #include "settings.h"
 #include "ui/helper.h"
+#ifndef BEACON_PLATFORM_V3
 #include "ui/menu.h"
+#endif
 #include "ui/ui.h"
 
 #define BEACON_DEFAULT_FREQUENCY_10HZ 43350000u
@@ -23,7 +30,12 @@
 #define BEACON_MAX_FREQUENCY_10HZ     43998700u
 #define BEACON_FREQUENCY_STEP_10HZ    100u
 #define BEACON_FREQUENCY_STEPS ((BEACON_MAX_FREQUENCY_10HZ - BEACON_MIN_FREQUENCY_10HZ) / BEACON_FREQUENCY_STEP_10HZ)
+#ifdef BEACON_PLATFORM_V3
+/* Reserved sector, unused by the pinned V3 upstream; never a channel slot. */
+#define BEACON_EEPROM_ADDRESS         0x00E000u
+#else
 #define BEACON_EEPROM_ADDRESS         (199u * 16u)
+#endif
 #define BEACON_CONFIG_MAGIC           0xB34Du
 #define BEACON_CONFIG_VERSION         4u
 #define BEACON_CONFIG_VERSION_OLD     2u
@@ -97,7 +109,11 @@ static void BEACON_DefaultConfig(void)
 
 static void BEACON_LoadConfig(void)
 {
+#ifdef BEACON_PLATFORM_V3
+	PY25Q16_ReadBuffer(BEACON_EEPROM_ADDRESS, &gBeaconConfig, sizeof(gBeaconConfig));
+#else
 	EEPROM_ReadBuffer(BEACON_EEPROM_ADDRESS, &gBeaconConfig, sizeof(gBeaconConfig));
+#endif
 	if (gBeaconConfig.magic == BEACON_CONFIG_MAGIC &&
 	    (gBeaconConfig.version == BEACON_CONFIG_VERSION_OLD || gBeaconConfig.version == 3u) &&
 	    gBeaconConfig.checksum == BEACON_Checksum(&gBeaconConfig) &&
@@ -139,7 +155,12 @@ static void BEACON_LoadConfig(void)
 static void BEACON_SaveConfig(void)
 {
 	gBeaconConfig.checksum = BEACON_Checksum(&gBeaconConfig);
+#ifdef BEACON_PLATFORM_V3
+	/* Preserve the rest of the sector on erase/rewrite. */
+	PY25Q16_WriteBuffer(BEACON_EEPROM_ADDRESS, &gBeaconConfig, sizeof(gBeaconConfig), false);
+#else
 	EEPROM_WriteBuffer(BEACON_EEPROM_ADDRESS, &gBeaconConfig);
+#endif
 }
 
 static void BEACON_Configure(void)
@@ -153,7 +174,12 @@ static void BEACON_Configure(void)
 	gCurrentVfo = gTxVfo;
 	gTxVfo->FrequencyReverse = false;
 	gTxVfo->Modulation = MODULATION_FM;
+#ifdef BEACON_PLATFORM_V3
+	gTxVfo->OUTPUT_POWER = OUTPUT_POWER_LOW1;
+	gTxVfo->DTMF_PTT_ID_TX_MODE = PTT_ID_OFF;
+#else
 	gTxVfo->OUTPUT_POWER = OUTPUT_POWER_LOW;
+#endif
 	gTxVfo->CHANNEL_BANDWIDTH = BK4819_FILTER_BW_NARROW;
 	gTxVfo->TX_OFFSET_FREQUENCY_DIRECTION = TX_OFFSET_FREQUENCY_DIRECTION_OFF;
 	gTxVfo->TX_OFFSET_FREQUENCY = 0;
@@ -167,6 +193,17 @@ static void BEACON_Configure(void)
 	gTxVfo->pRX = &gTxVfo->freq_config_RX;
 	gTxVfo->pTX = &gTxVfo->freq_config_TX;
 	RADIO_ConfigureSquelchAndOutputPower(gTxVfo);
+#ifdef BEACON_PLATFORM_V3
+	/* Use the raw LOW calibration, bypassing F4HWN's Low1..Low5 dividers. */
+	const unsigned band = FREQUENCY_GetBand(frequency);
+	uint8_t calibration[3];
+	PY25Q16_ReadBuffer(0x100D0u + band * 16u, calibration, sizeof(calibration));
+	gTxVfo->TXP_CalculatedSetting = FREQUENCY_CalculateOutputPower(
+		calibration[0], calibration[1], calibration[2],
+		frequencyBandTable[band].lower,
+		(frequencyBandTable[band].lower + frequencyBandTable[band].upper) / 2,
+		frequencyBandTable[band].upper, frequency);
+#endif
 	gTxVfo->TXP_CalculatedSetting =
 		((uint16_t)gTxVfo->TXP_CalculatedSetting * gBeaconConfig.power_percent + 99u) / 100u;
 	if (gTxVfo->TXP_CalculatedSetting == 0)
@@ -260,6 +297,12 @@ void BEACON_Init(bool admin_requested)
 	gBeaconAdmin = admin_requested;
 	gBeaconState = BEACON_IDLE;
 	BEACON_BuildSequence();
+#ifdef BEACON_PLATFORM_V3
+	BEACON_V3AdminInit();
+	BEACON_Configure();
+	gScreenToDisplay = DISPLAY_MAIN;
+	gRequestDisplayScreen = DISPLAY_MAIN;
+#else
 	if (gBeaconAdmin) {
 		gMenuCursor = UI_MENU_GetMenuIdx(MENU_BCN_FR);
 		gIsInSubMenu = false;
@@ -268,6 +311,7 @@ void BEACON_Init(bool admin_requested)
 		BEACON_Configure();
 		gRequestDisplayScreen = DISPLAY_MAIN;
 	}
+#endif
 	gUpdateDisplay = true;
 }
 
@@ -275,7 +319,7 @@ void BEACON_TimeSlice10ms(void)
 {
 	if (gBeaconAdmin || gBeaconState == BEACON_IDLE)
 		return;
-	if (gBatteryDisplayLevel == 0) {
+	if (gBatteryDisplayLevel == 0 || gBatteryDisplayLevel == 7) {
 		BEACON_Stop();
 		return;
 	}
@@ -294,13 +338,20 @@ void BEACON_TimeSlice10ms(void)
 
 bool BEACON_ProcessKey(KEY_Code_t key, bool pressed, bool held)
 {
+#ifdef BEACON_PLATFORM_V3
+	if (gBeaconAdmin)
+		return BEACON_V3AdminKey(key, pressed, held);
+#else
 	if (gBeaconAdmin)
 		return false;
+#endif
 	if (!pressed || held)
 		return true;
 	if (key == KEY_PTT) {
-		if (gBeaconState == BEACON_IDLE)
-			BEACON_StartRF();
+		if (gBeaconState == BEACON_IDLE) {
+			if (gBatteryDisplayLevel != 0 && gBatteryDisplayLevel != 7)
+				BEACON_StartRF();
+		}
 		else
 			BEACON_Stop();
 	} else if (key == KEY_EXIT && gBeaconState != BEACON_IDLE) {
@@ -313,6 +364,12 @@ bool BEACON_IsAdmin(void) { return gBeaconAdmin; }
 
 void BEACON_Display(void)
 {
+#ifdef BEACON_PLATFORM_V3
+	if (gBeaconAdmin) {
+		BEACON_V3AdminDisplay();
+		return;
+	}
+#endif
 	char frequency[18];
 	const uint32_t value = BEACON_GetFrequency();
 	sprintf(frequency, "%u.%03u MHz", value / 100000u, (value % 100000u) / 100u);

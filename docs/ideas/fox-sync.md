@@ -1,13 +1,13 @@
-# Projektidee: fünf drahtlos synchronisierte Füchse
+# Proposal: five wirelessly synchronized fox transmitters
 
-Stand: 4. Oktober 2026. **Entwurf; nicht implementiert.**
-Zielhardware: ausschließlich Quansheng UV-K5 V1 mit DP32G030/BK4819.
+Updated 4 October 2026. **Design draft; not implemented.**
+Target platforms: Quansheng UV-K5 V1 and V3. Each requires its own firmware build.
 
-## Ziel und Ausgangslage
+## Goal and present behavior
 
-Fünf Geräte sollen auf einer gemeinsamen Frequenz nacheinander senden:
+Five radios transmit in turn on a common frequency:
 
-| Fuchs | Kennung | Zeitschlitz im Fünf-Minuten-Zyklus |
+| Fox | Identifier | Slot in the five-minute cycle |
 | --- | --- | --- |
 | 1 | MOE | Minute 1 |
 | 2 | MOI | Minute 2 |
@@ -15,67 +15,65 @@ Fünf Geräte sollen auf einer gemeinsamen Frequenz nacheinander senden:
 | 4 | MOH | Minute 4 |
 | 5 | MO5 | Minute 5 |
 
-Die heutige Firmware wiederholt eine Kennung zweimal mit anschließender
-fünfsekündiger HF-Pause. Sie enthält weder diesen Zeitplan noch eine
-Synchronisation. Leistung bleibt derzeit auf den relativen LOW-DAC-Bereich
-begrenzt; eine Erweiterung auf höhere Leistungsstufen ist ebenfalls offen.
+Current beacon firmware sends the chosen identifier twice and then pauses RF for
+five seconds. Neither the above schedule nor synchronization is implemented.
+Power is limited to a percentage of the original LOW calibration; higher-power
+operation remains a separate future extension.
 
-Im Gelände hören sich möglicherweise nur benachbarte Füchse. Fuchs 1 soll die
-Zeit vorgeben; erreichbare Nachbarn sollen diese Zeit weitergeben. Eine reine
-Kette ist nur möglich, wenn jeder Fuchs seinen Vorgänger in der Sendereihenfolge
-empfangen kann. Räumliche Nachbarschaft allein garantiert das nicht.
+In the field, only neighboring foxes may hear each other. Fox 1 would provide
+the time reference; reachable neighbors would relay it. A simple chain works
+only if every fox can receive its predecessor in the transmission sequence.
+Physical proximity alone does not guarantee that ordering.
 
-## Diskutierte Verfahren
+## Candidate methods
 
-### Morsekennung als Identifikation
+### Morse identification
 
-MOE, MOI, MOS, MOH und MO5 identifizieren den jeweiligen Zeitschlitz. Eine
-wiederholte Kennung verrät jedoch ohne besonderen Marker nicht, wie viel Zeit
-seit Beginn der Minute vergangen ist. Automatische Morseerkennung und ein
-eindeutiger Zeitbezug müssten neu entwickelt und geprüft werden.
+MOE/MOI/MOS/MOH/MO5 identify the transmitting slot, but a repeated identifier
+alone does not reveal time elapsed since the start of the minute. Automatic
+Morse recognition and a unique timing reference require new implementation
+and tests.
 
-### CTCSS als Synchronisationshilfe
+### CTCSS timing assistance
 
-Vorschlag: Jeder Fuchs erhält einen eigenen CTCSS-Ton zusätzlich zur hörbaren
-Morsekennung. Ein einmaliger Marker an einer festgelegten Stelle der Sendeminute
-liefert den Zeitbezug. Die BK4819-Basis enthält Funktionen und Register für
-CTCSS-Erzeugung und -Erkennung; die Beacon-Erweiterung nutzt sie dafür noch nicht.
+Proposal: assign each fox its own CTCSS tone in addition to audible Morse.
+A one-off marker at a defined point in the transmitting minute provides timing.
+The radio driver has CTCSS generation/detection support; the beacon does not yet
+use it for synchronization.
 
-CTCSS-Erkennung benötigt Zeit. Die tatsächliche Verzögerung, ihre Streuung und
-die Erkennung bei schwachem Empfang müssen gemessen werden. Marker dürfen nicht
-mit den normalen Morsepausen oder einem normalen Trägerabfall verwechselt werden.
-Ob CTCSS während der vorhandenen BK4819-Morsetonerzeugung und
-TX-Stummschaltung bestehen bleibt, muss am realen Signal geprüft werden.
+CTCSS detection takes time. Measure latency, jitter, and weak-signal behavior.
+The marker must be distinguishable from Morse pauses and ordinary carrier loss.
+Confirm whether CTCSS remains present during the existing Morse tone generation
+and TX mute operations, separately on V1 and V3 hardware.
 
-Zunächst hört jedes Gerät auf einen fest eingestellten Ton seines Vorgängers.
-Eine spätere Erkennung beliebiger erreichbarer Füchse wäre robuster, erfordert
-aber ein Verfahren zur Tonwahl bzw. Suche. Gleichzeitige Erkennung von fünf
-CTCSS-Tönen wird nicht vorausgesetzt.
+Initially each radio listens for a fixed predecessor tone. Later recognition of
+any reachable fox would be more robust but needs a tone-selection/search method.
+Simultaneous decoding of five tones is not assumed.
 
-## Zeitsteuerung und Ausfälle
+## Scheduling and failures
 
-- Jedes Gerät besitzt eine lokale Uhr und berechnet seinen festen Zeitschlitz.
-- Ein Empfang korrigiert die Uhr; er löst nicht unmittelbar eine neue
-  vollständige Sendeminute aus. Sonst würden sich Erkennungsverzögerungen addieren.
-- Fuchs 1 bleibt die maßgebliche Zeitquelle. Die anderen dürfen keine unabhängig
-  abweichenden Zeitquellen bilden; Weitergabe und Korrekturregeln sind noch offen.
-- Schutzabstände zwischen Sendefenstern sollen Überschneidungen vermeiden.
-- Bei vorübergehendem Empfangsausfall läuft die eigene Uhr zunächst weiter.
-- Nach zu langer Zeit ohne gültige Synchronisation ist Sendestopp mit weiterem
-  Lauschen als mögliche Regel zu prüfen. Grenzwerte sind noch nicht festgelegt.
-- Ein getrenntes Funknetz ohne Empfangsweg zu Fuchs 1 kann nicht dauerhaft
-  garantiert synchron gehalten werden.
+- Each radio keeps a local clock and calculates its fixed slot.
+- Reception corrects the clock rather than immediately triggering a full minute
+  of transmission, which would accumulate detection delays.
+- Fox 1 remains the authoritative time source. Relays must not introduce
+  independent time references or correction loops; rules remain to be designed.
+- Guard intervals between slots help prevent overlapping transmissions.
+- Temporary loss of reception uses clock holdover.
+- Consider stopping TX and continuing to listen after prolonged loss of valid
+  synchronization. Thresholds have not been selected.
+- A disconnected group with no reception path to fox 1 cannot be guaranteed
+  to remain synchronized indefinitely.
 
-## Erster Versuch mit zwei Geräten
+## First experiment: two radios
 
-1. Gerät A sendet einen ausreichend langen, definierten CTCSS-Marker.
-2. Gerät B erkennt ihn und protokolliert die Erkennungszeit.
-3. B sendet in einem daraus berechneten Zeitfenster; kein unmittelbarer Start.
-4. Verzögerung und Streuung bei verschiedenen Pegeln und wiederholten Zyklen messen.
-5. Empfangsausfall, erneute Synchronisation und lokale Uhrabweichung testen.
-6. Erst anschließend auf fünf Geräte und Weitergabe über Nachbarn erweitern.
+1. A sends a sufficiently long, defined CTCSS marker.
+2. B detects it and records detection time.
+3. B sends in a calculated time window, rather than immediately on detection.
+4. Measure latency/jitter over repeated cycles and different signal levels.
+5. Test signal loss, resynchronization, and clock drift.
+6. Extend to five radios and neighbor relaying only after these results.
 
-Offen: geeignete Töne, Markerform und -dauer, Schutzabstände, Uhrkorrektur ohne
-Zeitkreise, Startprozedur im Gelände, Ausfallregeln und Stromverbrauch im Empfang.
-Das Konzept ist zunächst für Trainingsbetrieb vorgesehen. Eine Eignung für
-Wettkämpfe setzt Feldtests und Prüfung der jeweiligen Wettbewerbsregeln voraus.
+Open questions: tones, marker shape/duration, guards, loop-free clock correction,
+field startup, failure rules, and receive power consumption. Test V1/V1, V3/V3,
+and mixed V1/V3 pairs. The initial goal is training operation; competition use
+requires field validation and checking the applicable event rules.

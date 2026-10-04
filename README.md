@@ -1,114 +1,132 @@
-# Quansheng UV-K5 V1 – 70-cm-Peilsender
+# Quansheng UV-K5 V1 / V3 — 70 cm Morse beacon
 
-> **Ausgangsbasis:** Dieses Projekt ist eine Erweiterung der Firmware von
-> **Dennis Real**:
-> [`reald/uv-k5-firmware-custom`](https://github.com/reald/uv-k5-firmware-custom),
-> Basis-Commit `5955ccfc8732f4a16b628276ed5fa98f2db54e55`.
+[Deutsche Anleitung](README.de.md)
 
-Dieses Repository ist bewusst klein. Es kopiert nicht Dennis' komplettes
-Projekt, sondern enthält unter `source/` nur die hinzugefügten oder geänderten
-Dateien. Zum Übersetzen werden sie auf den oben genannten Stand seiner
-Firmware gelegt.
+A dedicated homing beacon for amateur-radio direction finding, built on
+**Dennis Real's firmware**. The repository retains its historical GitHub name
+`QuanshengK5V1Beacon`, but now contains separate V1 and V3 build targets.
 
-## Funktionen
+| Hardware | Upstream | Current status | Firmware |
+| --- | --- | --- | --- |
+| UV-K5 V1, DP32G030 | [reald V1](https://github.com/reald/uv-k5-firmware-custom) | Build and host tests pass; current image needs hardware testing | `release/Quansheng-K5-V1-70cm-Beacon.packed.bin` |
+| UV-K5 V3, PY32F071 | [reald V3](https://github.com/reald/uv-k1-k5v3-firmware-custom) | Initial port: build and host tests pass; hardware testing pending | `release/Quansheng-K5-V3-70cm-Beacon.bin` |
 
-- Quansheng UV-K5 **V1** mit DP32G030 als 70-cm-Peilsender
-- F2A-artiger Morse-Ton auf einem FM-Träger
-- Kennungen `MO`, `MOE`, `MOI`, `MOS`, `MOH` und `MO5`
-- zweimalige Kennung, danach fünf Sekunden vollständige Sendepause
-- 750 ms HF-Vorlauf vor der ersten Kennung
-- Frequenz 430,013 bis 439,987 MHz in 1-kHz-Schritten
-- Tonfrequenz 400 bis 1500 Hz in 50-Hz-Schritten
-- Leistung 1 bis 100 % des originalen LOW-DAC-Werts in 1-%-Schritten
-- Speicherung der Einstellungen im EEPROM
-- nicht blockierende Zustandsmaschine in Dennis' normaler Hauptschleife
+The two images are **not interchangeable**. V2 is not supported. Upstream V3
+also targets UV-K1, but this beacon has not been validated for UV-K1.
 
-PTT startet den Sender. PTT oder EXIT beendet ihn sofort. Ein automatischer
-Sendestart ist nicht enthalten.
+## Operation
 
-## Admin-Modus
+- Audible Morse tone on an FM carrier (F2A-style operation).
+- Identifiers `MO`, `MOE`, `MOI`, `MOS`, `MOH`, and `MO5` at 12 WPM.
+- Each identifier is sent twice, followed by a five-second RF-off pause.
+- The carrier starts 750 ms before the first Morse mark.
+- PTT starts operation. PTT or EXIT stops it.
+- Power-on never starts transmitting automatically.
+- Frequency: 430.013–439.987 MHz, in 1 kHz steps.
+- Audio tone: 400–1500 Hz, in 50 Hz steps.
+- Power: 1–100% of the original LOW calibration DAC value.
+- Settings survive power cycles; 1% is the default for missing/invalid settings.
 
-MENU beim Einschalten gedrückt halten. Danach:
+The percentage is a **relative control setting**, not a watt reading or a linear
+percentage of radiated power. Start low, test reception at the intended distance,
+and increase the percentage until the range suits your event. V1 and V3 need
+separate field adjustments even when their displayed percentages match.
 
-- UP/DOWN: Menüpunkt oder Wert wählen
-- MENU: öffnen beziehungsweise speichern
-- EXIT: Eingabe verwerfen / zurück
-- `BcnFrq`: MENU, sechs Ziffern in kHz eingeben (z. B. `433092` für
-  433,092 MHz), MENU speichert. UP/DOWN verändert um 1 kHz.
-- `BcnPwr`: MENU, `1` bis `100` eingeben, MENU speichert.
-  1 % ist der Standard bei fehlender oder ungültiger Beacon-Konfiguration.
-  Gespeicherte Werte (z. B. 17 %) bleiben nach Aus-/Einschalten erhalten.
+## Admin mode
 
-Unvollständige oder unzulässige Eingaben werden beim Speichern abgewiesen;
-EXIT verwirft sie. Alte gültige EEPROM-Konfigurationen werden übernommen,
-Frequenzen dabei auf den nächsten zulässigen 1-kHz-Wert gerundet.
+Hold MENU while switching on. Release the keys when prompted.
 
-Menüpunkte: `BcnFrq`, `BcnPwr`, `BcnID` und `BcnTon`. Im Admin-Modus wird
-nicht gesendet.
+| Item | Setting |
+| --- | --- |
+| `BcnFrq` | MENU, enter six digits in kHz, MENU to save; `433092` means 433.092 MHz |
+| `BcnPwr` | MENU, enter `1`–`100`, MENU to save |
+| `BcnID` | MENU, select MO/MOE/MOI/MOS/MOH/MO5 with UP/DOWN, MENU to save |
+| `BcnTon` | MENU, select tone with UP/DOWN, MENU to save |
 
-## Fertige Firmware
+UP/DOWN selects items or adjusts their values. EXIT discards the staged value.
+Incomplete frequencies and out-of-range values are rejected on confirmation.
+No transmission is possible in admin mode. Restart normally to use the beacon.
 
-Das flashbare Image liegt hier:
+V1 uses Dennis' menu system. V3 uses a dedicated four-item screen with the same
+labels and save/cancel behavior. In V3, UP/DOWN after typing discards the digit
+buffer and adjusts the previously saved value. The V3 build disables unrelated
+receiver features and normal scan/PTT-session logic while the beacon is running.
 
-`release/Quansheng-K5-V1-70cm-Beacon.packed.bin`
+## Firmware and flashing
 
-Es ist ausschließlich für den UV-K5 V1 bestimmt. Hinweise stehen in
-[`FLASHING.md`](FLASHING.md).
+Read [FLASHING.md](FLASHING.md) before selecting an image. V1 uses a packed file;
+V3 uses the raw `.bin` generated by its CMake build.
+Both current images are **test builds awaiting hardware validation**.
+The earlier V1 beacon was tested by the operator; that does not validate the
+new keypad version or the V3 port.
 
-## Quellcode zusammensetzen und bauen
+## Reproduce a build
 
-Unter Windows das Repository wegen des alten Makefiles in einem Pfad ohne
-Leerzeichen verwenden. PowerShell-Beispiel:
+This is an overlay repository: unchanged upstream files are not duplicated.
+The preparation scripts check out a pinned upstream revision and apply our files.
+The state machine, configuration format, Morse timing, and range validation in
+`source/app/beacon.c` and `.h` are shared between both targets. V3-specific hooks,
+admin UI, and build settings are under `source-v3/`.
+
+Prerequisites: Git, ARM GNU Toolchain, and Python 3. V1 additionally needs Make;
+V3 needs CMake (3.22 or later) and Ninja. ARM GCC 12.2.1 was used for verification.
+Use a destination without spaces for the legacy V1 Makefile.
+
+### V1
 
 ```powershell
-.\scripts\prepare-upstream.ps1 -Destination C:\UVK5BeaconBuild
-Set-Location C:\UVK5BeaconBuild
+.\scripts\prepare-upstream.ps1 -Hardware V1 -Destination C:\UVK5BeaconV1
+Set-Location C:\UVK5BeaconV1
 make clean
 make ENABLE_BEACON_MO=1 ENABLE_PREVENT_TX=0 ENABLE_ARDF=0 ENABLE_SPECTRUM=0 ENABLE_FMRADIO=0
 ```
 
-Der Beacon-Build schaltet ARDF-Empfänger, Spektrumanzeige und UKW-Radio aus,
-damit das Image in den V1-Flash passt. Erfolgreich geprüft mit ARM GCC 12.2.1.
+Output: `firmware_uvk5_v1.packed.bin`. The unused ARDF receiver, spectrum, and FM
+radio are disabled to fit V1 flash. V1 settings occupy the first eight bytes of
+channel slot 200 (address 0x0C70); reserve that channel for this firmware.
+Legacy beacon configuration versions 2/3 migrate to version 4, preserving valid
+power/ID/tone settings and rounding frequencies to the nearest allowed kHz.
+These version numbers describe the record format, **not radio hardware**.
 
-Das Skript klont Dennis' Originalprojekt, wechselt auf den festgelegten
-Basis-Commit und kopiert die Dateien aus `source/` darüber. Das Ergebnis
-`firmware_uvk5_v1.packed.bin` ist das flashbare Image.
+### V3
 
-## Entwicklerprüfung
-
-Nach dem Zusammensetzen des Quellbaums lässt sich die EEPROM-Logik auch
-auf einem PC mit GCC testen (Beispiel unter Linux):
-
-```sh
-gcc -std=gnu2x -DENABLE_BEACON_MO -I/path/to/prepared-upstream \
-  -ffunction-sections -fdata-sections tests/beacon-config.c \
-  -Wl,--gc-sections -o /tmp/beacon-config-test
-/tmp/beacon-config-test
+```powershell
+.\scripts\prepare-upstream.ps1 -Hardware V3 -Destination C:\UVK5BeaconV3
+Set-Location C:\UVK5BeaconV3
+cmake --preset Beacon
+cmake --build --preset Beacon
 ```
 
-Der Test prüft Standardwerte, Speicherung, ungültige Leistungswerte sowie
-Migration gültiger V2/V3-Konfigurationen einschließlich aller alten Frequenzen.
+Output: `build/Beacon/Quansheng-K5-V3-70cm-Beacon.bin`.
+V3 stores its eight-byte beacon record at external-flash address 0x00E000, in a
+sector unused by the pinned upstream. It does not reuse a channel slot or the
+ARDF/calibration sectors. Writes preserve the rest of the sector.
+V3 reads the original LOW calibration and applies the percentage directly,
+bypassing F4HWN's extra Low1–Low5 division.
 
-## Entwicklungsstand und Ausblick
+Linux/macOS alternative:
 
-Die Tastatureingabe und EEPROM-Migration sind implementiert. Der neue V1-Build
-und die EEPROM-Tests wurden softwareseitig geprüft; ein Gerätetest dieses
-neuen Images steht noch aus. Der vorherige Beacon-Stand wurde vom Betreiber
-praktisch getestet.
+```sh
+python3 scripts/prepare-upstream.py --hardware V1 --destination /tmp/beacon-v1
+python3 scripts/prepare-upstream.py --hardware V3 --destination /tmp/beacon-v3
+```
 
-Die automatische Fünf-Fuchs-Zeitsteuerung ist noch nicht implementiert.
-Die diskutierte Synchronisation über Nachbarn und CTCSS ist als
-[Projektidee](docs/ideas/fox-sync.md) dokumentiert.
+Then run the same Make or CMake commands inside the prepared tree.
 
-## Sicherheit
+## Verification
 
-Die Prozentanzeige bezeichnet relative PA-DAC-Werte, nicht lineare
-HF-Leistung. Jede Einstellung vor Antennenbetrieb an einem 50-Ohm-Dummyload
-mit Wattmeter prüfen. EEPROM und Kalibrierdaten vor dem Flashen sichern und
-die örtlichen Vorschriften beachten.
+See [docs/testing.md](docs/testing.md) for host tests, build results, and the
+hardware acceptance checklist. Hardware results should be recorded separately
+for V1 and V3 before declaring either current image validated.
 
-## Lizenz und Anerkennung
+## Future work
 
-Siehe [`NOTICE.md`](NOTICE.md) und [`LICENSE`](LICENSE). Die Beacon-Erweiterung
-benutzt ausdrücklich Dennis' Firmwarearchitektur und sein Menüsystem; sie ist
-keine offizielle Veröffentlichung oder Zusicherung von Dennis Real.
+The automatic five-fox schedule and wireless synchronization are **not
+implemented**. The [neighbor/CTCSS synchronization proposal](docs/ideas/fox-sync.md)
+is a common design direction for V1 and V3.
+
+## Credits and license
+
+See [NOTICE.md](NOTICE.md) and [LICENSE](LICENSE). Keep upstream copyright and
+license notices when distributing derived firmware. This experiment is not an
+official release or endorsement by Dennis Real or the upstream authors.

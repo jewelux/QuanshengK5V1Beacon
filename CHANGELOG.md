@@ -1,30 +1,39 @@
-# Änderungsprotokoll
+# Changelog
 
-## Admin-Tastatureingabe (zur Prüfung)
+## V1/V3 project and English documentation — 4 October 2026
 
-Vorbereitet am 3. Oktober 2026, dokumentiert am 4. Oktober 2026.
-Build und EEPROM-Tests bestanden; Hardwaretest des neuen Images steht aus.
+- English main documentation, with a German companion README.
+- Separate reproducible builds pinned to reald's V1 and V3 repositories.
+- Initial V3 beacon port using the shared Morse/configuration state machine.
+- V3 four-item admin screen with six-digit frequency and 1–100% power input.
+- V3 settings in external-flash sector 0x00E000, separate from channels/calibration.
+- V3 relative power based directly on original LOW calibration.
+- Dedicated V3 scheduler hooks prevent normal scan/PTT-session logic taking over.
+- Shared start/stop checks prevent TX at critical battery voltage or overvoltage.
+- Host tests extended for V3 flash storage, keypad validation, cancellation,
+  persistence, and complete MO5 sequences.
+- Both current images build successfully; hardware validation is pending.
+- Five-fox synchronization remains a design proposal for both targets.
 
-- Frequenz direkt mit sechs Ziffern in kHz; 1-kHz-Auflösung
-- Leistung direkt mit 1–100 %; MENU speichert, EXIT verwirft
-- Standardleistung 1 % bei fehlender/ungültiger Konfiguration
-- Gespeicherte Leistung bleibt erhalten; EEPROM V2/V3 wird auf V4 migriert
-- Alte Frequenzen werden auf den nächsten zulässigen kHz-Wert gerundet
-- Build-Anleitung mit passenden V1-Optionen; CRC-Fallback auch über make
+## Admin keypad entry — prepared 3 October, documented 4 October 2026
 
-## Beacon-Version
+- Direct six-digit frequency entry in kHz with 1 kHz resolution.
+- Direct 1–100% power entry; MENU saves and EXIT cancels.
+- Default 1% for missing/invalid configuration; saved values persist.
+- Beacon record versions 2/3 migrate to version 4.
+- Legacy frequencies round to the nearest allowed kHz.
+- V1 build options and CRC fallback integrated into Make.
+- Build and host tests pass; current image hardware test pending.
 
-- 70-cm-Peilsenderbetrieb für UV-K5 V1
-- PTT-gesteuerter Start und sofortiger Stopp mit PTT oder EXIT
-- zweimalige Morsekennung und anschließend fünf Sekunden Sendepause
-- 750 ms HF-Vorlauf
-- Kennungen MO und MOE bis MO5
-- einstellbare Frequenz, relative LOW-Leistung und Tonfrequenz
-- EEPROM-Speicherung
-- Admin-Modus auf Basis von Dennis' Menüsystem
-- nicht blockierende 10-ms-Zustandsmaschine
-- originaler LOW-DAC-Wert bei 100 %, ohne zusätzliche Division durch fünf
-- interner CRC-16/XMODEM-Fallback im Packprogramm
+## Initial V1 beacon
 
-Noch nicht enthalten: automatische Zeitsteuerung eines klassischen
-Fünf-Sender-Wettbewerbs.
+- PTT-controlled 70 cm beacon; PTT or EXIT stops operation.
+- Two Morse identifiers followed by five seconds with RF off.
+- 750 ms carrier warm-up; MO and MOE through MO5 identifiers.
+- Adjustable frequency, relative LOW power, and audio tone.
+- EEPROM storage and admin mode based on Dennis' menu system.
+- Non-blocking 10 ms state machine.
+- Original LOW DAC value at 100%, without extra division by five.
+- Internal CRC-16/XMODEM fallback in the packing tool.
+
+Automatic five-transmitter scheduling is not implemented.
