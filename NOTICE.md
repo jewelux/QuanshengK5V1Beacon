@@ -1,17 +1,23 @@
-# Herkunft und Anerkennung
+# Origins and acknowledgements
 
-Diese Peilsender-Erweiterung basiert auf der Firmware von **Dennis Real**:
+This beacon is based on **Dennis Real's** open-source ARDF firmware:
 
-https://github.com/reald/uv-k5-firmware-custom
+| Target | Repository | Pinned revision |
+| --- | --- | --- |
+| V1 | https://github.com/reald/uv-k5-firmware-custom | `5955ccfc8732f4a16b628276ed5fa98f2db54e55` |
+| V3 | https://github.com/reald/uv-k1-k5v3-firmware-custom | `97b1890bed9628f625d787bfa42683f2da912614` |
 
-- Basis-Commit: `5955ccfc8732f4a16b628276ed5fa98f2db54e55`
-- Datum des Basis-Commits: 2. August 2026
-- Titel: `ARDF: Introduce negative gain settings for additional attenuation close to tranmitters`
+The V1 base commit dates from 2 August 2026 and introduces negative ARDF gain
+settings. V3 was pinned from reald's main branch on 4 October 2026.
 
-Die Änderungen ergänzen Dennis' Hauptschleife, Tastaturverarbeitung,
-Menüsystem und Gerätetreiber. Dieses kleine Overlay-Repository enthält deshalb
-nur die geänderten Dateien und verweist für den unveränderten Quellcode auf
-das Originalprojekt.
+The V1 lineage includes Egzumer and DualTachyon. The V3 lineage includes Armels
+F4HWN port, muzkr, Egzumer, and DualTachyon. The original driver, UI, and firmware
+copyright notices remain in the modified files. Both upstreams carry the
+Apache-2.0 license, included here as LICENSE.
 
-Die Nennung bedeutet keine offizielle Unterstützung dieser experimentellen
-Erweiterung durch Dennis Real.
+The overlay contains only added/changed files. Unchanged sources are retrieved
+from the pinned upstream during preparation. Shared beacon logic is maintained
+in source/app/beacon.c and source/app/beacon.h; source-v3 contains the V3 adapter.
+
+Naming an upstream author does not imply their endorsement or a guarantee for
+this experimental transmitting extension.

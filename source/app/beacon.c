@@ -1,4 +1,4 @@
-/* Non-blocking ARDF homing beacon integrated into Dennis' normal UI loop. */
+/* Non-blocking homing beacon shared by the V1 and V3 overlays. */
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -7,7 +7,12 @@
 #include "app/beacon.h"
 #include "driver/backlight.h"
 #include "driver/bk4819.h"
+#ifdef BEACON_PLATFORM_V3
+#include "driver/py25q16.h"
+#include "frequencies.h"
+#else
 #include "driver/eeprom.h"
+#endif
 #include "external/printf/printf.h"
 #include "functions.h"
 #include "helper/battery.h"
@@ -15,17 +20,24 @@
 #include "radio.h"
 #include "settings.h"
 #include "ui/helper.h"
+#ifndef BEACON_PLATFORM_V3
 #include "ui/menu.h"
+#endif
 #include "ui/ui.h"
 
 #define BEACON_DEFAULT_FREQUENCY_10HZ 43350000u
-#define BEACON_MIN_FREQUENCY_10HZ     43001250u
-#define BEACON_MAX_FREQUENCY_10HZ     43998750u
-#define BEACON_FREQUENCY_STEP_10HZ    1250u
+#define BEACON_MIN_FREQUENCY_10HZ     43001300u
+#define BEACON_MAX_FREQUENCY_10HZ     43998700u
+#define BEACON_FREQUENCY_STEP_10HZ    100u
 #define BEACON_FREQUENCY_STEPS ((BEACON_MAX_FREQUENCY_10HZ - BEACON_MIN_FREQUENCY_10HZ) / BEACON_FREQUENCY_STEP_10HZ)
+#ifdef BEACON_PLATFORM_V3
+/* Reserved sector, unused by the pinned V3 upstream; never a channel slot. */
+#define BEACON_EEPROM_ADDRESS         0x00E000u
+#else
 #define BEACON_EEPROM_ADDRESS         (199u * 16u)
+#endif
 #define BEACON_CONFIG_MAGIC           0xB34Du
-#define BEACON_CONFIG_VERSION         3u
+#define BEACON_CONFIG_VERSION         4u
 #define BEACON_CONFIG_VERSION_OLD     2u
 #define BEACON_CODE_COUNT             6u
 #define BEACON_TONE_MIN_HZ            400u
@@ -91,24 +103,43 @@ static void BEACON_DefaultConfig(void)
 	gBeaconConfig.version = BEACON_CONFIG_VERSION;
 	gBeaconConfig.code_tone = ((1000u - BEACON_TONE_MIN_HZ) / BEACON_TONE_STEP_HZ) << 3;
 	gBeaconConfig.frequency_index = (BEACON_DEFAULT_FREQUENCY_10HZ - BEACON_MIN_FREQUENCY_10HZ) / BEACON_FREQUENCY_STEP_10HZ;
-	gBeaconConfig.power_percent = 20u;
+	gBeaconConfig.power_percent = 1u;
 	gBeaconConfig.checksum = BEACON_Checksum(&gBeaconConfig);
 }
 
 static void BEACON_LoadConfig(void)
 {
+#ifdef BEACON_PLATFORM_V3
+	PY25Q16_ReadBuffer(BEACON_EEPROM_ADDRESS, &gBeaconConfig, sizeof(gBeaconConfig));
+#else
 	EEPROM_ReadBuffer(BEACON_EEPROM_ADDRESS, &gBeaconConfig, sizeof(gBeaconConfig));
-	if (gBeaconConfig.magic == BEACON_CONFIG_MAGIC && gBeaconConfig.version == BEACON_CONFIG_VERSION_OLD &&
-	    gBeaconConfig.checksum == BEACON_Checksum(&gBeaconConfig)) {
-		/* V2 byte 3 held code/power and byte 6 held the tone index. */
-		const uint8_t old_selection = gBeaconConfig.code_tone;
-		const uint8_t old_tone = gBeaconConfig.power_percent;
-		if ((old_selection & 0xC0u) == 0 && (old_selection & 7u) < BEACON_CODE_COUNT &&
-		    ((old_selection >> 3) & 7u) < 5u && old_tone <= BEACON_TONE_STEPS &&
-		    gBeaconConfig.frequency_index <= BEACON_FREQUENCY_STEPS) {
+#endif
+	if (gBeaconConfig.magic == BEACON_CONFIG_MAGIC &&
+	    (gBeaconConfig.version == BEACON_CONFIG_VERSION_OLD || gBeaconConfig.version == 3u) &&
+	    gBeaconConfig.checksum == BEACON_Checksum(&gBeaconConfig) &&
+	    gBeaconConfig.frequency_index <= 798u) {
+		bool valid = true;
+		if (gBeaconConfig.version == BEACON_CONFIG_VERSION_OLD) {
+			/* V2 byte 3 held code/power and byte 6 held the tone index. */
+			const uint8_t old_selection = gBeaconConfig.code_tone;
+			const uint8_t old_tone = gBeaconConfig.power_percent;
+			valid = (old_selection & 0xC0u) == 0 && (old_selection & 7u) < BEACON_CODE_COUNT &&
+			        ((old_selection >> 3) & 7u) < 5u && old_tone <= BEACON_TONE_STEPS;
+			if (valid) {
+				gBeaconConfig.code_tone = (old_selection & 7u) | (old_tone << 3);
+				gBeaconConfig.power_percent = (((old_selection >> 3) & 7u) + 1u) * 20u;
+			}
+		} else {
+			valid = BEACON_GetCode() < BEACON_CODE_COUNT && BEACON_GetToneIndex() <= BEACON_TONE_STEPS &&
+			        gBeaconConfig.power_percent >= 1u && gBeaconConfig.power_percent <= 100u;
+		}
+		if (valid) {
+			/* Migrate the old 12.5-kHz grid to the nearest in-range kHz. */
+			uint32_t frequency_khz = (43001250u + (uint32_t)gBeaconConfig.frequency_index * 1250u + 50u) / 100u;
+			if (frequency_khz > BEACON_MAX_FREQUENCY_10HZ / 100u)
+				frequency_khz = BEACON_MAX_FREQUENCY_10HZ / 100u;
+			gBeaconConfig.frequency_index = frequency_khz - BEACON_MIN_FREQUENCY_10HZ / 100u;
 			gBeaconConfig.version = BEACON_CONFIG_VERSION;
-			gBeaconConfig.code_tone = (old_selection & 7u) | (old_tone << 3);
-			gBeaconConfig.power_percent = ((((old_selection >> 3) & 7u) + 1u) * 20u);
 			BEACON_SaveConfig();
 			return;
 		}
@@ -124,7 +155,12 @@ static void BEACON_LoadConfig(void)
 static void BEACON_SaveConfig(void)
 {
 	gBeaconConfig.checksum = BEACON_Checksum(&gBeaconConfig);
+#ifdef BEACON_PLATFORM_V3
+	/* Preserve the rest of the sector on erase/rewrite. */
+	PY25Q16_WriteBuffer(BEACON_EEPROM_ADDRESS, &gBeaconConfig, sizeof(gBeaconConfig), false);
+#else
 	EEPROM_WriteBuffer(BEACON_EEPROM_ADDRESS, &gBeaconConfig);
+#endif
 }
 
 static void BEACON_Configure(void)
@@ -138,7 +174,12 @@ static void BEACON_Configure(void)
 	gCurrentVfo = gTxVfo;
 	gTxVfo->FrequencyReverse = false;
 	gTxVfo->Modulation = MODULATION_FM;
+#ifdef BEACON_PLATFORM_V3
+	gTxVfo->OUTPUT_POWER = OUTPUT_POWER_LOW1;
+	gTxVfo->DTMF_PTT_ID_TX_MODE = PTT_ID_OFF;
+#else
 	gTxVfo->OUTPUT_POWER = OUTPUT_POWER_LOW;
+#endif
 	gTxVfo->CHANNEL_BANDWIDTH = BK4819_FILTER_BW_NARROW;
 	gTxVfo->TX_OFFSET_FREQUENCY_DIRECTION = TX_OFFSET_FREQUENCY_DIRECTION_OFF;
 	gTxVfo->TX_OFFSET_FREQUENCY = 0;
@@ -152,6 +193,17 @@ static void BEACON_Configure(void)
 	gTxVfo->pRX = &gTxVfo->freq_config_RX;
 	gTxVfo->pTX = &gTxVfo->freq_config_TX;
 	RADIO_ConfigureSquelchAndOutputPower(gTxVfo);
+#ifdef BEACON_PLATFORM_V3
+	/* Use the raw LOW calibration, bypassing F4HWN's Low1..Low5 dividers. */
+	const unsigned band = FREQUENCY_GetBand(frequency);
+	uint8_t calibration[3];
+	PY25Q16_ReadBuffer(0x100D0u + band * 16u, calibration, sizeof(calibration));
+	gTxVfo->TXP_CalculatedSetting = FREQUENCY_CalculateOutputPower(
+		calibration[0], calibration[1], calibration[2],
+		frequencyBandTable[band].lower,
+		(frequencyBandTable[band].lower + frequencyBandTable[band].upper) / 2,
+		frequencyBandTable[band].upper, frequency);
+#endif
 	gTxVfo->TXP_CalculatedSetting =
 		((uint16_t)gTxVfo->TXP_CalculatedSetting * gBeaconConfig.power_percent + 99u) / 100u;
 	if (gTxVfo->TXP_CalculatedSetting == 0)
@@ -245,14 +297,22 @@ void BEACON_Init(bool admin_requested)
 	gBeaconAdmin = admin_requested;
 	gBeaconState = BEACON_IDLE;
 	BEACON_BuildSequence();
+#ifdef BEACON_PLATFORM_V3
+	BEACON_V3AdminInit();
+	BEACON_Configure();
+	gScreenToDisplay = DISPLAY_MAIN;
+	gRequestDisplayScreen = DISPLAY_MAIN;
+#else
 	if (gBeaconAdmin) {
 		gMenuCursor = UI_MENU_GetMenuIdx(MENU_BCN_FR);
 		gIsInSubMenu = false;
 		gRequestDisplayScreen = DISPLAY_MENU;
 	} else {
 		BEACON_Configure();
+		gScreenToDisplay = DISPLAY_MAIN;
 		gRequestDisplayScreen = DISPLAY_MAIN;
 	}
+#endif
 	gUpdateDisplay = true;
 }
 
@@ -260,7 +320,7 @@ void BEACON_TimeSlice10ms(void)
 {
 	if (gBeaconAdmin || gBeaconState == BEACON_IDLE)
 		return;
-	if (gBatteryDisplayLevel == 0) {
+	if (gBatteryDisplayLevel == 0 || gBatteryDisplayLevel == 7) {
 		BEACON_Stop();
 		return;
 	}
@@ -279,13 +339,20 @@ void BEACON_TimeSlice10ms(void)
 
 bool BEACON_ProcessKey(KEY_Code_t key, bool pressed, bool held)
 {
+#ifdef BEACON_PLATFORM_V3
+	if (gBeaconAdmin)
+		return BEACON_V3AdminKey(key, pressed, held);
+#else
 	if (gBeaconAdmin)
 		return false;
+#endif
 	if (!pressed || held)
 		return true;
 	if (key == KEY_PTT) {
-		if (gBeaconState == BEACON_IDLE)
-			BEACON_StartRF();
+		if (gBeaconState == BEACON_IDLE) {
+			if (gBatteryDisplayLevel != 0 && gBatteryDisplayLevel != 7)
+				BEACON_StartRF();
+		}
 		else
 			BEACON_Stop();
 	} else if (key == KEY_EXIT && gBeaconState != BEACON_IDLE) {
@@ -298,28 +365,37 @@ bool BEACON_IsAdmin(void) { return gBeaconAdmin; }
 
 void BEACON_Display(void)
 {
+#ifdef BEACON_PLATFORM_V3
+	if (gBeaconAdmin) {
+		BEACON_V3AdminDisplay();
+		return;
+	}
+#endif
 	char frequency[18];
 	const uint32_t value = BEACON_GetFrequency();
-	sprintf(frequency, "%u.%04u MHz", value / 100000u, (value % 100000u) / 10u);
+	sprintf(frequency, "%u.%03u MHz", value / 100000u, (value % 100000u) / 100u);
 	UI_DisplayClear();
 	UI_PrintString(gBeaconCodeNames[BEACON_GetCode()], 0, 127, 0, 10);
 	UI_PrintString(frequency, 0, 127, 2, 8);
 	if (gBeaconState == BEACON_IDLE) {
 		UI_PrintString("PTT = START", 0, 127, 4, 8);
-		UI_PrintString("LOW POWER", 0, 127, 6, 8);
+		UI_PrintStringSmallNormal("LOW POWER", 0, 127, 6);
 	} else if (gBeaconState == BEACON_PAUSE) {
 		UI_PrintString("TX PAUSE 5 SEC", 0, 127, 4, 8);
-		UI_PrintString("PTT/EXIT STOP", 0, 127, 6, 8);
+		UI_PrintStringSmallNormal("PTT/EXIT STOP", 0, 127, 6);
 	} else {
 		UI_PrintString(gBeaconState == BEACON_WARMUP ? "TX WARMUP" : "SENDING", 0, 127, 4, 8);
-		UI_PrintString("PTT/EXIT STOP", 0, 127, 6, 8);
+		UI_PrintStringSmallNormal("PTT/EXIT STOP", 0, 127, 6);
 	}
 }
 
 void BEACON_GetMenuLimits(uint8_t menu_id, int32_t *minimum, int32_t *maximum)
 {
 	*minimum = menu_id == MENU_BCN_PW ? 1 : 0;
-	if (menu_id == MENU_BCN_FR) *maximum = BEACON_FREQUENCY_STEPS;
+	if (menu_id == MENU_BCN_FR) {
+		*minimum = BEACON_MIN_FREQUENCY_10HZ / 100u;
+		*maximum = BEACON_MAX_FREQUENCY_10HZ / 100u;
+	}
 	else if (menu_id == MENU_BCN_PW) *maximum = 100;
 	else if (menu_id == MENU_BCN_ID) *maximum = BEACON_CODE_COUNT - 1u;
 	else *maximum = BEACON_TONE_STEPS;
@@ -327,7 +403,7 @@ void BEACON_GetMenuLimits(uint8_t menu_id, int32_t *minimum, int32_t *maximum)
 
 int32_t BEACON_GetMenuValue(uint8_t menu_id)
 {
-	if (menu_id == MENU_BCN_FR) return gBeaconConfig.frequency_index;
+	if (menu_id == MENU_BCN_FR) return BEACON_GetFrequency() / 100u;
 	if (menu_id == MENU_BCN_PW) return gBeaconConfig.power_percent;
 	if (menu_id == MENU_BCN_ID) return BEACON_GetCode();
 	return BEACON_GetToneIndex();
@@ -335,7 +411,11 @@ int32_t BEACON_GetMenuValue(uint8_t menu_id)
 
 void BEACON_SetMenuValue(uint8_t menu_id, int32_t value)
 {
-	if (menu_id == MENU_BCN_FR) gBeaconConfig.frequency_index = value;
+	int32_t minimum, maximum;
+	BEACON_GetMenuLimits(menu_id, &minimum, &maximum);
+	if (value < minimum || value > maximum)
+		return;
+	if (menu_id == MENU_BCN_FR) gBeaconConfig.frequency_index = value - BEACON_MIN_FREQUENCY_10HZ / 100u;
 	else if (menu_id == MENU_BCN_PW) gBeaconConfig.power_percent = value;
 	else if (menu_id == MENU_BCN_ID) gBeaconConfig.code_tone = (gBeaconConfig.code_tone & 0xF8u) | (value & 7u);
 	else gBeaconConfig.code_tone = (gBeaconConfig.code_tone & 7u) | ((value & 0x1Fu) << 3);
@@ -346,8 +426,8 @@ void BEACON_SetMenuValue(uint8_t menu_id, int32_t value)
 void BEACON_FormatMenuValue(uint8_t menu_id, int32_t selection, char *text)
 {
 	if (menu_id == MENU_BCN_FR) {
-		const uint32_t value = BEACON_MIN_FREQUENCY_10HZ + (uint32_t)selection * BEACON_FREQUENCY_STEP_10HZ;
-		sprintf(text, "%u.%04u\nMHz", value / 100000u, (value % 100000u) / 10u);
+		const uint32_t value = (uint32_t)selection * 100u;
+		sprintf(text, "%u.%03u\nMHz", value / 100000u, (value % 100000u) / 100u);
 	} else if (menu_id == MENU_BCN_PW) {
 		sprintf(text, "%u%%\nof LOW", (unsigned)selection);
 	} else if (menu_id == MENU_BCN_ID) {

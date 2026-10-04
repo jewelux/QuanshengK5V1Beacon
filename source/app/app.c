@@ -810,6 +810,11 @@ static void HandleVox(void)
 
 void APP_Update(void)
 {
+#ifdef ENABLE_BEACON_MO
+	/* The beacon owns RF in user mode; preserve the normal admin menu loop. */
+	if (!BEACON_IsAdmin())
+		return;
+#endif
 #ifdef ENABLE_VOICE
 	if (gFlagPlayQueuedVoice) {
 			AUDIO_PlayQueuedVoice();
@@ -1106,7 +1111,15 @@ void APP_TimeSlice10ms(void)
 	gFlashLightBlinkCounter++;
 
 #ifdef ENABLE_BEACON_MO
-	BEACON_TimeSlice10ms();
+	if (!BEACON_IsAdmin()) {
+		BEACON_TimeSlice10ms();
+		CheckKeys();
+		if (gUpdateDisplay) {
+			gUpdateDisplay = false;
+			GUI_DisplayScreen();
+		}
+		return;
+	}
 #endif
 
 #ifdef ENABLE_ARDF
@@ -1282,6 +1295,15 @@ void cancelUserInputModes(void)
 void APP_TimeSlice500ms(void)
 {
 	gNextTimeslice_500ms = false;
+#ifdef ENABLE_BEACON_MO
+	if (!BEACON_IsAdmin()) {
+		BOARD_ADC_GetBatteryInfo(&gBatteryVoltages[gBatteryVoltageIndex++], &gBatteryCurrent);
+		if (gBatteryVoltageIndex > 3)
+			gBatteryVoltageIndex = 0;
+		BATTERY_GetReadings(false);
+		return;
+	}
+#endif
 	bool exit_menu = false;
 
 	// Skipped authentic device check
