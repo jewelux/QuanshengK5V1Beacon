@@ -309,6 +309,7 @@ void BEACON_Init(bool admin_requested)
 		gRequestDisplayScreen = DISPLAY_MENU;
 	} else {
 		BEACON_Configure();
+		gScreenToDisplay = DISPLAY_MAIN;
 		gRequestDisplayScreen = DISPLAY_MAIN;
 	}
 #endif
@@ -378,13 +379,13 @@ void BEACON_Display(void)
 	UI_PrintString(frequency, 0, 127, 2, 8);
 	if (gBeaconState == BEACON_IDLE) {
 		UI_PrintString("PTT = START", 0, 127, 4, 8);
-		UI_PrintString("LOW POWER", 0, 127, 6, 8);
+		UI_PrintStringSmallNormal("LOW POWER", 0, 127, 6);
 	} else if (gBeaconState == BEACON_PAUSE) {
 		UI_PrintString("TX PAUSE 5 SEC", 0, 127, 4, 8);
-		UI_PrintString("PTT/EXIT STOP", 0, 127, 6, 8);
+		UI_PrintStringSmallNormal("PTT/EXIT STOP", 0, 127, 6);
 	} else {
 		UI_PrintString(gBeaconState == BEACON_WARMUP ? "TX WARMUP" : "SENDING", 0, 127, 4, 8);
-		UI_PrintString("PTT/EXIT STOP", 0, 127, 6, 8);
+		UI_PrintStringSmallNormal("PTT/EXIT STOP", 0, 127, 6);
 	}
 }
 

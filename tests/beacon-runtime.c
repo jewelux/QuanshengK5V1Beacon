@@ -1,6 +1,7 @@
-/* V3 host simulation: checks timing and RF control, not physical RF output. */
+/* V1/V3 host simulation: checks timing and RF control, not physical RF output. */
 #include <assert.h>
 #include "app/beacon.c"
+#include "frequencies.h"
 
 EEPROM_Config_t gEeprom;
 static VFO_Info_t vfo;
@@ -12,6 +13,7 @@ static unsigned starts, writes;
 static BEACON_Config_t saved;
 const freq_band_table_t frequencyBandTable[] = {{40000000, 47000000}};
 
+#ifdef BEACON_PLATFORM_V3
 void PY25Q16_ReadBuffer(uint32_t address, void *buffer, uint32_t size)
 {
     if (address == BEACON_EEPROM_ADDRESS) memcpy(buffer, &saved, size);
@@ -22,11 +24,24 @@ void PY25Q16_WriteBuffer(uint32_t address, const void *buffer, uint32_t size, bo
     assert(address == BEACON_EEPROM_ADDRESS && size == sizeof(saved) && !append);
     memcpy(&saved, buffer, size); ++writes;
 }
+#else
+void EEPROM_ReadBuffer(uint16_t address, void *buffer, uint8_t size)
+{ assert(address == BEACON_EEPROM_ADDRESS); memcpy(buffer, &saved, size); }
+void EEPROM_WriteBuffer(uint16_t address, const void *buffer)
+{ assert(address == BEACON_EEPROM_ADDRESS); memcpy(&saved, buffer, sizeof(saved)); ++writes; }
+#endif
 FREQUENCY_Band_t FREQUENCY_GetBand(uint32_t f) { assert(f >= 43001300 && f <= 43998700); return 0; }
 uint8_t FREQUENCY_CalculateOutputPower(uint8_t a, uint8_t b, uint8_t c, int32_t l, int32_t m, int32_t u, int32_t f)
 { (void)b; (void)c; (void)l; (void)m; (void)u; (void)f; return a; }
 void RADIO_SelectVfos(void) {}
-void RADIO_ConfigureSquelchAndOutputPower(VFO_Info_t *p) { p->TXP_CalculatedSetting = 4; }
+void RADIO_ConfigureSquelchAndOutputPower(VFO_Info_t *p)
+{
+#ifdef BEACON_PLATFORM_V3
+    p->TXP_CalculatedSetting = 4; // Extra Low1 division must be overridden.
+#else
+    p->TXP_CalculatedSetting = 100;
+#endif
+}
 void RADIO_SetupRegisters(bool f) { (void)f; }
 void FUNCTION_Select(FUNCTION_Type_t f) { if (f == FUNCTION_TRANSMIT) { rfOn = true; ++starts; } }
 void BK4819_EnterTxMute(void) { toneOn = false; }
@@ -67,6 +82,20 @@ int main(void)
     gBeaconAdmin = true; BEACON_ProcessKey(KEY_PTT, true, false); assert(!rfOn);
     gBeaconAdmin = false; BEACON_ProcessKey(KEY_PTT, true, false); assert(rfOn);
     BEACON_ProcessKey(KEY_PTT, true, false); assert(!rfOn);
+    BEACON_ProcessKey(KEY_PTT, true, false);
+    for (unsigned cycle = 0; cycle < 10; ++cycle) {
+        for (unsigned i = 0; i < BEACON_WARMUP_TICKS; ++i) BEACON_TimeSlice10ms();
+        assert(rfOn && toneOn);
+        while (gBeaconState == BEACON_SEQUENCE) {
+            if (toneOn) assert(rfOn);
+            BEACON_TimeSlice10ms();
+        }
+        assert(gBeaconState == BEACON_PAUSE && !rfOn && !toneOn);
+        for (unsigned i = 0; i < BEACON_PAUSE_TICKS; ++i) BEACON_TimeSlice10ms();
+        assert(rfOn && !toneOn && gBeaconState == BEACON_WARMUP);
+    }
+    BEACON_ProcessKey(KEY_EXIT, true, false);
+    assert(!rfOn && gBeaconState == BEACON_IDLE);
     assert(writes == 1); // running never writes config
     return 0;
 }

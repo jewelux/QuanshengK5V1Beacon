@@ -4,7 +4,10 @@
 
 **V3:** Eine erste Portierung auf Basis von Dennis Reals V3-Firmware ist
 vorbereitet. ARM-Build und PC-Tests bestanden; der Gerätetest steht aus.
-V3 verwendet einen eigenen Einstellbildschirm mit denselben vier Menüpunkten.
+V3 zeigt jetzt alle vier Menüpunkte gleichzeitig: Freq, Power, ID und Tone.
+UP/DOWN bewegt den Auswahlpfeil. Für 17 %: Power auswählen, MENU, 17 eingeben,
+MENU speichert. EXIT verwirft eine Eingabe. Die korrigierten Images müssen
+noch einmal am Gerät getestet werden.
 Firmware: `release/Quansheng-K5-V3-70cm-Beacon.bin`.
 Diese Datei ausschließlich mit einem V3-kompatiblen Flashwerkzeug verwenden.
 Die nachfolgende ausführliche Anleitung beschreibt V1. Die aktuellen

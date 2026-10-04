@@ -332,6 +332,7 @@ void UI_DisplayMain(void)
 #ifdef ENABLE_BEACON_MO
 	if (!BEACON_IsAdmin()) {
 		BEACON_Display();
+		ST7565_BlitFullScreen();
 		return;
 	}
 #endif

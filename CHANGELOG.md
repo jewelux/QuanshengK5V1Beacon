@@ -1,5 +1,19 @@
 # Changelog
 
+## Hardware-test follow-up — 4 October 2026
+
+- Fix a two-page font starting on the last of seven framebuffer pages. It
+  overwrote memory beyond the display buffer; the V1 linker placed settings
+  immediately after that buffer. The final beacon hint now uses a one-page font.
+- V1 user-mode scheduler gives the beacon exclusive RF control; admin menu
+  processing is retained. Flush the V1 beacon framebuffer to the LCD explicitly.
+- V3 admin lists Freq, Power, ID and Tone together with a selection arrow.
+  Clear edit/save/cancel hints fit on the last two pages; invalid input has feedback.
+- Regression tests use actual upstream fonts/renderers with AddressSanitizer
+  and UndefinedBehaviorSanitizer, plus ten automatic repeat cycles on both targets.
+- Operator reported successful V1 flashing/menu and V3 flashing/Morse on the
+  previous images. Corrected images still require a repeat hardware test.
+
 ## V1/V3 project and English documentation — 4 October 2026
 
 - English main documentation, with a German companion README.

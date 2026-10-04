@@ -95,7 +95,7 @@ int main(void)
 	BEACON_DefaultConfig();
 	BEACON_V3AdminInit();
 	press(KEY_MENU); type("43309"); press(KEY_MENU);
-	assert(editing && BEACON_GetFrequency() == 43350000); // incomplete
+	assert(editing && inputError && BEACON_GetFrequency() == 43350000); // incomplete
 	press(KEY_2); press(KEY_MENU);
 	assert(!editing && BEACON_GetFrequency() == 43309200);
 	press(KEY_MENU); type("439988"); press(KEY_MENU);
@@ -104,11 +104,11 @@ int main(void)
 	press(KEY_DOWN); press(KEY_MENU); type("17"); press(KEY_MENU);
 	BEACON_LoadConfig(); assert(gBeaconConfig.power_percent == 17);
 	press(KEY_MENU); type("101"); press(KEY_MENU);
-	assert(editing && gBeaconConfig.power_percent == 17);
+	assert(editing && inputError && gBeaconConfig.power_percent == 17);
 	press(KEY_EXIT); press(KEY_MENU); type("50"); press(KEY_EXIT);
 	assert(gBeaconConfig.power_percent == 17);
 	press(KEY_MENU); type("0"); press(KEY_MENU);
-	assert(editing && gBeaconConfig.power_percent == 17);
+	assert(editing && inputError && gBeaconConfig.power_percent == 17);
 	press(KEY_EXIT); press(KEY_MENU); press(KEY_UP); press(KEY_MENU);
 	assert(gBeaconConfig.power_percent == 18);
 	BEACON_V3AdminKey(KEY_PTT, true, false);

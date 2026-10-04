@@ -8,20 +8,23 @@
 
 static uint8_t cursor, digitCount;
 static bool editing;
+static const char *inputError;
 static int32_t selection;
 static char digits[7];
-static const char *const names[] = {"BcnFrq", "BcnPwr", "BcnID", "BcnTon"};
+static const char *const names[] = {"Freq", "Power", "ID", "Tone"};
 
 void BEACON_V3AdminInit(void)
 {
     cursor = digitCount = 0;
     editing = false;
+    inputError = NULL;
 }
 
 bool BEACON_V3AdminKey(KEY_Code_t key, bool pressed, bool held)
 {
     if (!pressed || (held && key != KEY_UP && key != KEY_DOWN))
         return true;
+    inputError = NULL;
     if (key == KEY_MENU) {
         if (!editing) {
             selection = BEACON_GetMenuValue(cursor);
@@ -32,7 +35,11 @@ bool BEACON_V3AdminKey(KEY_Code_t key, bool pressed, bool held)
             BEACON_GetMenuLimits(cursor, &minimum, &maximum);
             if (digitCount && ((cursor == MENU_BCN_FR && digitCount != 6) ||
                                selection < minimum || selection > maximum))
+            {
+                inputError = cursor == MENU_BCN_FR && digitCount != 6 ? "Need 6 digits" : "Out of range";
+                gUpdateDisplay = true;
                 return true;
+            }
             BEACON_SetMenuValue(cursor, selection);
             editing = false;
             digitCount = 0;
@@ -70,22 +77,34 @@ bool BEACON_V3AdminKey(KEY_Code_t key, bool pressed, bool held)
 
 void BEACON_V3AdminDisplay(void)
 {
-    char value[24];
+    char value[24], row[32];
     UI_DisplayClear();
-    UI_PrintString("BEACON ADMIN", 0, 127, 0, 8);
-    UI_PrintString(names[cursor], 0, 127, 2, 8);
-    if (editing && digitCount) {
-        memcpy(value, digits, digitCount);
-        unsigned length = digitCount;
-        if (cursor == MENU_BCN_FR)
+    if (inputError)
+        strcpy(row, inputError);
+    else if (editing)
+        sprintf(row, "EDIT: %s", names[cursor]);
+    else
+        strcpy(row, "BEACON SETTINGS");
+    UI_PrintStringSmallNormal(row, 0, 127, 0);
+
+    /* All four items remain visible. Each small-font row occupies one page. */
+    for (unsigned item = 0; item < 4; ++item) {
+        const int32_t current = editing && item == cursor ? selection : BEACON_GetMenuValue(item);
+        if (editing && item == cursor && digitCount && item == MENU_BCN_FR) {
+            memcpy(value, digits, digitCount);
+            unsigned length = digitCount;
             while (length < 6) value[length++] = '_';
-        value[length] = 0;
-    } else {
-        BEACON_FormatMenuValue(cursor, editing ? selection : BEACON_GetMenuValue(cursor), value);
-        /* The simple screen uses one value line rather than stock menu layout. */
-        for (char *p = value; *p; ++p)
-            if (*p == '\n') *p = ' ';
+            strcpy(value + length, " kHz");
+        } else if (item == MENU_BCN_PW) {
+            sprintf(value, "%u%% LOW", (unsigned)current);
+        } else {
+            BEACON_FormatMenuValue(item, current, value);
+            for (char *p = value; *p; ++p)
+                if (*p == '\n') *p = ' ';
+        }
+        sprintf(row, "%c%s %s", item == cursor ? '>' : ' ', names[item], value);
+        UI_PrintStringSmallNormal(row, 2, 0, item + 1);
     }
-    UI_PrintString(value, 0, 127, 4, 8);
-    UI_PrintString(editing ? "MENU=SAVE EXIT=X" : "MENU EDIT UP/DN", 0, 127, 6, 8);
+    UI_PrintStringSmallNormal(editing ? "MENU: save" : "MENU: edit", 0, 127, 5);
+    UI_PrintStringSmallNormal(editing ? "EXIT: cancel" : "UP/DN: select", 0, 127, 6);
 }

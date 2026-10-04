@@ -1,6 +1,28 @@
 # Verification and first hardware tests
 
-Status: 4 October 2026. Both current images are awaiting hardware tests.
+Status: 4 October 2026. The corrected images are awaiting repeat hardware tests.
+
+## Operator report and follow-up fix
+
+The operator tested the images from commit `7cde3b3b8d92989a968921461332efc6c32daf28`:
+
+| Target | Observations |
+| --- | --- |
+| V1 | Flashing and menu worked. One initial correct Morse transmission was heard; later transmissions had no audible tone and appeared to retain RF. |
+| V3 | Flashing and Morse worked. Bottom menu instructions were clipped, and navigation/power entry was unclear. |
+
+The real-font host test reproduced a write beyond the seven-page framebuffer:
+`UI_PrintString` writes two pages but was called on page 6. This affected both
+beacon status screens and the V3 admin footer. In the V1 image, settings follow
+the framebuffer in RAM, so the overflow could corrupt radio settings. This is a
+confirmed memory error, not proof that every possible RF problem is resolved.
+
+The fix uses a one-page footer, lists all V3 settings with a selection arrow,
+provides visible save/cancel and invalid-input messages, and isolates V1 user-mode
+beacon RF control from normal receiver/TOT/power-save processing. V1's beacon
+screen is explicitly flushed to the LCD. V1 admin processing is retained.
+The corrected images need an operator retest, especially multiple consecutive
+Morse repetitions and V3 saving/reloading of a power percentage.
 
 ## Software checks completed
 
@@ -8,11 +30,11 @@ ARM GNU Toolchain 12.2.1:
 
 | Target | Code + initialized data | BSS | Distributed image |
 | --- | ---: | ---: | ---: |
-| V1 | 50,308 bytes | 2,684 bytes | 50,326 bytes, packed with metadata and CRC |
-| V3 | 28,332 bytes | 6,268 bytes | 28,332 bytes, raw |
+| V1 | 50,276 bytes | 2,684 bytes | 50,294 bytes, packed with metadata and CRC |
+| V3 | 28,588 bytes | 6,272 bytes | 28,588 bytes, raw |
 
-Both fit their linker regions. V3 RAM usage including 36 bytes of initialized data and a 1,536-byte reserved
-heap/stack region is 7,840 bytes of 16 KiB. This is link-time allocation, not
+Both fit their linker regions. V3 RAM usage including 36 bytes of initialized data and a 1,540-byte reserved
+heap/stack region is 7,848 bytes of 16 KiB. This is link-time allocation, not
 measured peak stack.
 SHA-256 checksums are in [release/SHA256SUMS](../release/SHA256SUMS).
 The V1 packed CRC is independently checked with Python's CRC-16/XMODEM function.
@@ -30,7 +52,10 @@ Host checks cover:
 - Complete two-word MO5 sequence fits the event buffer.
 - Runtime simulation verifies 75 warm-up ticks, two-word sequence, 500 RF-off
   ticks, restart, press/release/held handling, PTT/EXIT stop, battery interlock,
-  and percentage scaling from original LOW calibration.
+  and percentage scaling from original LOW calibration. Both targets run ten
+  consecutive automatic RF-off/restart cycles in the simulation.
+- Real upstream fonts/renderers under AddressSanitizer and UndefinedBehaviorSanitizer
+  check all identifiers/states and V3 browse/edit screens, including maximum values.
 
 These tests simulate drivers; they do not establish actual frequency, modulation,
 RF-off leakage, flash reliability, or transmission range.
@@ -56,8 +81,27 @@ gcc -std=gnu2x -DENABLE_BEACON_MO -DBEACON_PLATFORM_V3 -I/tmp/beacon-v3/App \
 /tmp/beacon-runtime-test
 ```
 
-A successful test exits with status 0. Runtime simulation covers the shared state
-machine against V3 adapter stubs; it is not a V1 RF-driver simulation.
+Run the runtime command above without `-DBEACON_PLATFORM_V3` and with
+`-I/tmp/beacon-v1` to test the V1 adapter as well.
+
+For display bounds checks with the actual upstream fonts/renderers:
+
+```sh
+gcc -std=gnu2x -DENABLE_BEACON_MO -DBEACON_PLATFORM_V3 -I/tmp/beacon-v3/App \
+  -fsanitize=address,undefined -g -ffunction-sections -fdata-sections \
+  tests/beacon-display.c /tmp/beacon-v3/App/ui/helper.c \
+  /tmp/beacon-v3/App/font.c /tmp/beacon-v3/App/external/printf/printf.c \
+  -Wl,--gc-sections -o /tmp/beacon-display-v3
+ASAN_OPTIONS=detect_leaks=0 /tmp/beacon-display-v3
+```
+
+For V1, omit the V3 definition and use the corresponding prepared V1 paths.
+Leak checking is disabled because this test allocates no heap memory and some
+containers block LeakSanitizer's process inspection. Address/undefined-behavior
+checks remain enabled. Optional output paths export PBM screenshots for inspection.
+
+A successful test exits with status 0. Runtime tests simulate driver behavior;
+only the display tests use actual upstream rendering code.
 
 ## Hardware acceptance — perform separately for each target
 
